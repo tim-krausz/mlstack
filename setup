@@ -1,0 +1,287 @@
+#!/usr/bin/env bash
+# mlstack setup — register skills with Claude Code and/or Codex, update instruction files
+set -e
+
+MLSTACK_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# ─── Helpers ──────────────────────────────────────────────────────────────────
+
+usage() {
+  cat <<EOF
+Usage: ./setup [OPTIONS]
+
+Register mlstack skills with Claude Code and/or Codex, and optionally
+inject the skill list into CLAUDE.md / AGENTS.md in your working directory.
+
+Options:
+  --claude          Register skills with Claude Code only
+  --codex           Register skills with Codex only
+  --no-docs         Skip updating CLAUDE.md / AGENTS.md
+  --working-dir DIR Update CLAUDE.md / AGENTS.md in DIR (default: \$PWD)
+  --help            Show this help message
+
+Without --claude or --codex, setup registers with all detected platforms.
+EOF
+  exit 0
+}
+
+# Discover skills: find directories with SKILL.md and extract name + first line of description
+discover_skills() {
+  local skills=()
+  for skill_dir in "$MLSTACK_DIR"/*/; do
+    [ -f "$skill_dir/SKILL.md" ] || continue
+    local skill_name
+    skill_name="$(basename "$skill_dir")"
+    # Skip special directories
+    [[ "$skill_name" == node_modules ]] && continue
+    [[ "$skill_name" == .git ]] && continue
+    skills+=("$skill_name")
+  done
+  # Sort for consistent output
+  printf '%s\n' "${skills[@]}" | sort
+}
+
+# Extract a short description from a skill's SKILL.md frontmatter
+# Joins all description lines and extracts the first sentence.
+skill_description() {
+  local skill_dir="$1"
+  awk '
+    /^---$/ { frontmatter++; next }
+    frontmatter == 1 && /^description:/ {
+      sub(/^description:[[:space:]]*\|?[[:space:]]*$/, "", $0)
+      if ($0 != "" && $0 !~ /^\|/) { buf = $0; capture = 1; next }
+      capture = 1; next
+    }
+    frontmatter == 1 && capture && /^[[:space:]]/ {
+      sub(/^[[:space:]]+/, "")
+      if (buf != "") buf = buf " " $0; else buf = $0
+      next
+    }
+    frontmatter == 1 && capture && /^[^[:space:]]/ { done = 1 }
+    frontmatter >= 2 { done = 1 }
+    done { exit }
+    END {
+      # Extract up to two sentences for a useful summary
+      n = split(buf, chars, "")
+      out = ""
+      sentences = 0
+      for (i = 1; i <= n; i++) {
+        out = out chars[i]
+        if (chars[i] == "." && (i == n || chars[i+1] == " " || chars[i+1] == "\n")) {
+          sentences++
+          if (sentences >= 2) break
+        }
+      }
+      print out
+    }
+  ' "$skill_dir/SKILL.md"
+}
+
+# Generate the skill list block (shared between CLAUDE.md and AGENTS.md)
+generate_skill_block() {
+  local format="$1"  # "claude" or "agents"
+  local skills
+  mapfile -t skills < <(discover_skills)
+
+  if [ "$format" = "agents" ]; then
+    echo "## mlstack skills"
+    echo ""
+    echo "Skills installed from mlstack. Use the skill name to activate a specialist mode."
+    echo "Each skill has a SKILL.md with detailed instructions that the agent should read"
+    echo "when the skill is invoked."
+    echo ""
+    echo "Available skills:"
+  else
+    echo "## mlstack skills"
+  fi
+
+  for skill in "${skills[@]}"; do
+    local desc
+    desc="$(skill_description "$MLSTACK_DIR/$skill")"
+    echo "- \`/$skill\` — $desc"
+  done
+}
+
+# Inject or update the mlstack block in a markdown file
+# Looks for "## mlstack skills" header and replaces everything until the next ## header or EOF
+update_doc_file() {
+  local file="$1"
+  local format="$2"  # "claude" or "agents"
+  local block
+  block="$(generate_skill_block "$format")"
+
+  if [ ! -f "$file" ]; then
+    # Create the file with just the mlstack block
+    echo "$block" > "$file"
+    echo "  created $file"
+    return
+  fi
+
+  # Check if mlstack section already exists
+  if grep -q '^## mlstack skills' "$file"; then
+    # Replace existing block: from "## mlstack skills" to next "## " header or EOF
+    local tmpfile
+    tmpfile="$(mktemp)"
+    awk -v block="$block" '
+      /^## mlstack skills/ { in_block=1; print block; next }
+      in_block && /^## / { in_block=0 }
+      !in_block { print }
+    ' "$file" > "$tmpfile"
+    mv "$tmpfile" "$file"
+    echo "  updated $file (replaced mlstack skills section)"
+  else
+    # Append the block
+    echo "" >> "$file"
+    echo "$block" >> "$file"
+    echo "  updated $file (appended mlstack skills section)"
+  fi
+}
+
+# ─── Parse arguments ──────────────────────────────────────────────────────────
+
+REGISTER_CLAUDE=0
+REGISTER_CODEX=0
+UPDATE_DOCS=1
+WORKING_DIR=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --claude) REGISTER_CLAUDE=1; shift ;;
+    --codex)  REGISTER_CODEX=1; shift ;;
+    --no-docs) UPDATE_DOCS=0; shift ;;
+    --working-dir) WORKING_DIR="$2"; shift 2 ;;
+    --help) usage ;;
+    *) echo "Unknown option: $1"; usage ;;
+  esac
+done
+
+# Default: register with all detected platforms
+if [ "$REGISTER_CLAUDE" -eq 0 ] && [ "$REGISTER_CODEX" -eq 0 ]; then
+  REGISTER_CLAUDE=1
+  REGISTER_CODEX=1
+fi
+
+# Default working dir: caller's PWD (not mlstack dir)
+if [ -z "$WORKING_DIR" ]; then
+  WORKING_DIR="${OLDPWD:-$PWD}"
+fi
+
+# ─── Discover skills ─────────────────────────────────────────────────────────
+
+echo "mlstack setup"
+echo "  source: $MLSTACK_DIR"
+echo ""
+
+mapfile -t SKILLS < <(discover_skills)
+echo "Found ${#SKILLS[@]} skills: ${SKILLS[*]}"
+echo ""
+
+# ─── Register with Claude Code ────────────────────────────────────────────────
+
+if [ "$REGISTER_CLAUDE" -eq 1 ]; then
+  CLAUDE_SKILLS_DIR="${HOME}/.claude/skills"
+
+  if [ -d "${HOME}/.claude" ] || [ "$REGISTER_CLAUDE" -eq 1 ]; then
+    mkdir -p "$CLAUDE_SKILLS_DIR"
+
+    # If mlstack is already inside the skills dir, just symlink individual skills
+    MLSTACK_PARENT="$(dirname "$MLSTACK_DIR")"
+    MLSTACK_BASENAME="$(basename "$MLSTACK_DIR")"
+
+    linked=()
+    for skill in "${SKILLS[@]}"; do
+      target="$CLAUDE_SKILLS_DIR/$skill"
+      if [ "$(cd "$MLSTACK_PARENT" 2>/dev/null && pwd)" = "$(cd "$CLAUDE_SKILLS_DIR" 2>/dev/null && pwd)" ]; then
+        # mlstack is inside the skills directory — use relative symlink
+        if [ -L "$target" ] || [ ! -e "$target" ]; then
+          ln -snf "$MLSTACK_BASENAME/$skill" "$target"
+          linked+=("$skill")
+        fi
+      else
+        # mlstack is elsewhere — use absolute symlink
+        if [ -L "$target" ] || [ ! -e "$target" ]; then
+          ln -snf "$MLSTACK_DIR/$skill" "$target"
+          linked+=("$skill")
+        fi
+      fi
+    done
+
+    echo "Claude Code:"
+    if [ ${#linked[@]} -gt 0 ]; then
+      echo "  linked ${#linked[@]} skills in $CLAUDE_SKILLS_DIR"
+    else
+      echo "  all skills already linked"
+    fi
+  fi
+  echo ""
+fi
+
+# ─── Register with Codex ─────────────────────────────────────────────────────
+
+if [ "$REGISTER_CODEX" -eq 1 ]; then
+  CODEX_HOME="${CODEX_HOME:-${HOME}/.codex}"
+  CODEX_SKILLS_DIR="$CODEX_HOME/skills"
+
+  mkdir -p "$CODEX_SKILLS_DIR"
+
+  # Codex discovers skills by finding SKILL.md in subdirectories of ~/.codex/skills/
+  # Symlink the entire mlstack directory so Codex sees mlstack/*/SKILL.md
+  CODEX_MLSTACK="$CODEX_SKILLS_DIR/mlstack"
+  if [ -L "$CODEX_MLSTACK" ] || [ ! -e "$CODEX_MLSTACK" ]; then
+    ln -snf "$MLSTACK_DIR" "$CODEX_MLSTACK"
+    echo "Codex:"
+    echo "  linked mlstack → $CODEX_SKILLS_DIR/mlstack"
+  else
+    echo "Codex:"
+    echo "  mlstack already present at $CODEX_SKILLS_DIR/mlstack"
+  fi
+
+  # Also symlink individual skill directories directly into codex skills
+  # so they can be invoked as $skill-name without the mlstack/ prefix
+  linked=()
+  for skill in "${SKILLS[@]}"; do
+    target="$CODEX_SKILLS_DIR/$skill"
+    if [ -L "$target" ] || [ ! -e "$target" ]; then
+      ln -snf "$MLSTACK_DIR/$skill" "$target"
+      linked+=("$skill")
+    fi
+  done
+  if [ ${#linked[@]} -gt 0 ]; then
+    echo "  linked ${#linked[@]} individual skills"
+  fi
+  echo ""
+fi
+
+# ─── Update documentation files ──────────────────────────────────────────────
+
+if [ "$UPDATE_DOCS" -eq 1 ]; then
+  echo "Updating instruction files in: $WORKING_DIR"
+
+  # Update CLAUDE.md if it exists or Claude is being registered
+  if [ -f "$WORKING_DIR/CLAUDE.md" ] || [ "$REGISTER_CLAUDE" -eq 1 ]; then
+    update_doc_file "$WORKING_DIR/CLAUDE.md" "claude"
+  fi
+
+  # Update AGENTS.md if it exists or Codex is being registered
+  if [ -f "$WORKING_DIR/AGENTS.md" ] || [ "$REGISTER_CODEX" -eq 1 ]; then
+    update_doc_file "$WORKING_DIR/AGENTS.md" "agents"
+  fi
+
+  echo ""
+fi
+
+# ─── Done ─────────────────────────────────────────────────────────────────────
+
+echo "mlstack ready."
+echo ""
+echo "  Skills: ${SKILLS[*]}"
+if [ "$REGISTER_CLAUDE" -eq 1 ]; then
+  echo "  Claude Code: ~/.claude/skills/"
+fi
+if [ "$REGISTER_CODEX" -eq 1 ]; then
+  echo "  Codex: ${CODEX_HOME:-~/.codex}/skills/"
+fi
+if [ "$UPDATE_DOCS" -eq 1 ]; then
+  [ -f "$WORKING_DIR/CLAUDE.md" ] && echo "  CLAUDE.md: $WORKING_DIR/CLAUDE.md"
+  [ -f "$WORKING_DIR/AGENTS.md" ] && echo "  AGENTS.md: $WORKING_DIR/AGENTS.md"
+fi
