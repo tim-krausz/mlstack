@@ -2,7 +2,7 @@
 
 **mlstack turns Claude Code from one generic assistant into a team of ML/data specialists you can summon on demand.**
 
-Nine opinionated workflow skills for Claude Code. Analysis planning, statistical review, ML architecture review, notebook authoring, exploratory data analysis, feature engineering, model critique, retrospectives, and analysis shipping — all as slash commands.
+Ten opinionated workflow skills for Claude Code. Analysis planning, statistical review, ML architecture review, notebook authoring, exploratory data analysis, feature engineering, model critique, performance optimization, retrospectives, and analysis shipping — all as slash commands.
 
 ### Without mlstack
 - The agent takes your analysis request literally — it never asks if you're framing the problem correctly
@@ -23,6 +23,7 @@ Nine opinionated workflow skills for Claude Code. Analysis planning, statistical
 | `/eda` | Senior Data Analyst | Systematic exploratory analysis with structured reports, distribution profiles, missingness maps, and relationship matrices. |
 | `/feature-eng` | ML Engineer | Feature engineering, selection, and transformation with domain-aware rationale and leakage detection. |
 | `/model-critique` | ML Research Scientist | Adversarial model evaluation. Challenge every modeling choice: was this the right algorithm, the right metric, the right validation strategy? |
+| `/review-perf` | ML Performance Engineer | Review training/inference code for efficiency: GPU utilization, data loading throughput, memory footprint, precision, unnecessary computation. |
 | `/retro-analysis` | Analytics Manager | Team-aware retrospective: analysis velocity, reproducibility, insight yield, and per-person growth. |
 | `/ship-analysis` | Release Analyst | Package analysis into a reproducible deliverable: freeze environment, validate outputs, generate executive summary, archive artifacts. |
 
@@ -46,6 +47,7 @@ Add to your `CLAUDE.md`:
 - `/eda` — Systematic exploratory data analysis with structured reporting
 - `/feature-eng` — Feature engineering with leakage detection and domain rationale
 - `/model-critique` — Adversarial model evaluation and methodology challenge
+- `/review-perf` — ML Performance Engineer review (GPU util, dataloaders, precision, throughput)
 - `/retro-analysis` — Analytics team retrospective with reproducibility tracking
 - `/ship-analysis` — Package and ship reproducible analysis artifacts
 ```
@@ -66,11 +68,13 @@ Add to your `CLAUDE.md`:
 
 6. **Critique with `/model-critique`** after training. Your adversarial reviewer asks: "Was nested cross-validation actually necessary here? Did you check if a simple baseline beats this? Your pipeline assumed normality but these features violate that assumption." This is the review that saves you from publishing embarrassing results.
 
-7. **Review notebooks with `/review-notebook`** before sharing. Catches the sins: p-hacking patterns, undisclosed multiple comparisons, leaky preprocessing, conclusions that don't follow from the evidence.
+7. **Optimize with `/review-perf`** on your training and inference code. Your performance engineer profiles the implementation and finds the bottlenecks: GPU sitting idle waiting on the dataloader, full FP32 weights that should be BF16, redundant forward passes on frozen backbones. Every suggestion comes with an estimated speedup and a concrete code fix.
 
-8. **Ship with `/ship-analysis`**. Freeze the environment, validate all outputs reproduce, generate an executive summary, archive everything. Your analysis is now a citable, reproducible artifact.
+8. **Review notebooks with `/review-notebook`** before sharing. Catches the sins: p-hacking patterns, undisclosed multiple comparisons, leaky preprocessing, conclusions that don't follow from the evidence.
 
-9. **Reflect with `/retro-analysis`**. Track analysis velocity, reproducibility rate, insight yield, and methodology quality over time.
+9. **Ship with `/ship-analysis`**. Freeze the environment, validate all outputs reproduce, generate an executive summary, archive everything. Your analysis is now a citable, reproducible artifact.
+
+10. **Reflect with `/retro-analysis`**. Track analysis velocity, reproducibility rate, insight yield, and methodology quality over time.
 
 ## License
 

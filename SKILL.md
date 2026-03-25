@@ -1,13 +1,13 @@
 ---
 name: mlstack
-version: 1.0.0
+version: 1.1.0
 description: |
-  ML and data analysis team as slash commands. Nine specialist modes: PI analysis
+  ML and data analysis team as slash commands. Ten specialist modes: PI analysis
   review, biostatistician methods review, ML architecture review, notebook review,
   exploratory data analysis, feature engineering, adversarial model critique,
-  analytics retrospective, and analysis shipping. Each mode activates a different
-  expert persona with domain-specific checklists, critique patterns, and quality
-  standards.
+  performance optimization, analytics retrospective, and analysis shipping. Each mode
+  activates a different expert persona with domain-specific checklists, critique
+  patterns, and quality standards.
 allowed-tools:
   - Bash
   - Read
@@ -21,7 +21,7 @@ allowed-tools:
 
 # mlstack: ML & Data Analysis Team
 
-Nine specialist modes for rigorous data analysis. Use the slash command to activate a mode.
+Ten specialist modes for rigorous data analysis. Use the slash command to activate a mode.
 
 ## Available Commands
 
@@ -34,6 +34,7 @@ Nine specialist modes for rigorous data analysis. Use the slash command to activ
 | `/eda` | Senior Data Analyst | Exploring a new dataset — systematic profiling with structured output |
 | `/feature-eng` | ML Engineer | Creating features — domain rationale, leakage detection, selection |
 | `/model-critique` | Research Scientist | After modeling — adversarial evaluation of every methodological choice |
+| `/review-perf` | ML Performance Engineer | After implementation — GPU util, dataloader throughput, precision, memory, speed |
 | `/retro-analysis` | Analytics Manager | Weekly reflection — notebook quality, methodology rigor, insight yield |
 | `/ship-analysis` | Release Analyst | Packaging for delivery — reproducibility, environment freeze, summary |
 
@@ -46,6 +47,7 @@ Nine specialist modes for rigorous data analysis. Use the slash command to activ
 /eda data/train.csv     → Structured exploration notebook
 /feature-eng --target y → Domain-aware features with leakage audit
 /model-critique         → "Was this actually the best approach?"
+/review-perf            → "Why is the GPU 40% idle?"
 /review-notebook        → Pre-submission methodology check
 /ship-analysis          → Package reproducible deliverable
 /retro-analysis          → Weekly analytics retrospective
