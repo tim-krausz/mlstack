@@ -30,24 +30,36 @@ EOF
   exit 0
 }
 
-# Discover skills: find directories with SKILL.md and extract name + first line of description
+# Discover skills: find directories with SKILL.md, return sorted list
 discover_skills() {
-  local skills=()
   for skill_dir in "$MLSTACK_DIR"/*/; do
     [ -f "$skill_dir/SKILL.md" ] || continue
-    local skill_name
     skill_name="$(basename "$skill_dir")"
-    # Skip special directories
-    [[ "$skill_name" == node_modules ]] && continue
-    [[ "$skill_name" == .git ]] && continue
-    skills+=("$skill_name")
-  done
-  # Sort for consistent output
-  printf '%s\n' "${skills[@]}" | sort
+    case "$skill_name" in
+      node_modules|.git) continue ;;
+    esac
+    echo "$skill_name"
+  done | sort
+}
+
+# Read discover_skills output into a space-separated variable (Bash 3.2 compatible)
+# Sets SKILLS_LIST (space-separated) and SKILLS_COUNT
+load_skills() {
+  SKILLS_LIST=""
+  SKILLS_COUNT=0
+  local skill
+  while IFS= read -r skill; do
+    if [ -z "$SKILLS_LIST" ]; then
+      SKILLS_LIST="$skill"
+    else
+      SKILLS_LIST="$SKILLS_LIST $skill"
+    fi
+    SKILLS_COUNT=$((SKILLS_COUNT + 1))
+  done < <(discover_skills)
 }
 
 # Extract a short description from a skill's SKILL.md frontmatter
-# Joins all description lines and extracts the first sentence.
+# Joins all description lines and extracts up to two sentences.
 skill_description() {
   local skill_dir="$1"
   awk '
@@ -85,8 +97,6 @@ skill_description() {
 # Generate the skill list block (shared between CLAUDE.md and AGENTS.md)
 generate_skill_block() {
   local format="$1"  # "claude" or "agents"
-  local skills
-  mapfile -t skills < <(discover_skills)
 
   if [ "$format" = "agents" ]; then
     echo "## mlstack skills"
@@ -100,7 +110,8 @@ generate_skill_block() {
     echo "## mlstack skills"
   fi
 
-  for skill in "${skills[@]}"; do
+  local skill
+  for skill in $SKILLS_LIST; do
     local desc
     desc="$(skill_description "$MLSTACK_DIR/$skill")"
     echo "- \`/$skill\` — $desc"
@@ -152,29 +163,28 @@ update_doc_file() {
 detect_working_dir() {
   local dir="$MLSTACK_DIR"
 
-  # Walk up looking for a .claude or .codex parent
-  while [ "$dir" != "/" ]; do
-    local base
-    base="$(basename "$dir")"
-    local parent
-    parent="$(dirname "$dir")"
-
-    # Check if we're inside .claude/skills/ or .codex/skills/
-    if [[ "$dir" == */.claude/skills/* ]] || [[ "$dir" == */.codex/skills/* ]]; then
-      # Go up to the .claude or .codex directory, then one more to the project root
+  # Check if the path contains .claude/skills/ or .codex/skills/
+  case "$dir" in
+    */.claude/skills/*|*/.codex/skills/*)
+      # Walk up to the .claude or .codex directory
       local skills_dir
       skills_dir="$(dirname "$dir")"
-      while [[ "$(basename "$skills_dir")" != ".claude" ]] && [[ "$(basename "$skills_dir")" != ".codex" ]] && [[ "$skills_dir" != "/" ]]; do
+      while true; do
+        local base
+        base="$(basename "$skills_dir")"
+        case "$base" in
+          .claude|.codex)
+            echo "$(dirname "$skills_dir")"
+            return
+            ;;
+        esac
+        if [ "$skills_dir" = "/" ]; then
+          break
+        fi
         skills_dir="$(dirname "$skills_dir")"
       done
-      if [[ "$(basename "$skills_dir")" == ".claude" ]] || [[ "$(basename "$skills_dir")" == ".codex" ]]; then
-        echo "$(dirname "$skills_dir")"
-        return
-      fi
-    fi
-
-    dir="$parent"
-  done
+      ;;
+  esac
 
   # Fallback: caller's working directory
   echo "$PWD"
@@ -187,7 +197,7 @@ REGISTER_CODEX=0
 UPDATE_DOCS=1
 WORKING_DIR=""
 
-while [[ $# -gt 0 ]]; do
+while [ $# -gt 0 ]; do
   case "$1" in
     --claude) REGISTER_CLAUDE=1; shift ;;
     --codex)  REGISTER_CODEX=1; shift ;;
@@ -219,8 +229,8 @@ echo "mlstack setup"
 echo "  source: $MLSTACK_DIR"
 echo ""
 
-mapfile -t SKILLS < <(discover_skills)
-echo "Found ${#SKILLS[@]} skills: ${SKILLS[*]}"
+load_skills
+echo "Found $SKILLS_COUNT skills: $SKILLS_LIST"
 echo ""
 
 # ─── Register with Claude Code ────────────────────────────────────────────────
@@ -228,37 +238,35 @@ echo ""
 if [ "$REGISTER_CLAUDE" -eq 1 ]; then
   CLAUDE_SKILLS_DIR="${HOME}/.claude/skills"
 
-  if [ -d "${HOME}/.claude" ] || [ "$REGISTER_CLAUDE" -eq 1 ]; then
-    mkdir -p "$CLAUDE_SKILLS_DIR"
+  mkdir -p "$CLAUDE_SKILLS_DIR"
 
-    # If mlstack is already inside the skills dir, just symlink individual skills
-    MLSTACK_PARENT="$(dirname "$MLSTACK_DIR")"
-    MLSTACK_BASENAME="$(basename "$MLSTACK_DIR")"
+  # If mlstack is already inside the skills dir, use relative symlinks
+  MLSTACK_PARENT="$(dirname "$MLSTACK_DIR")"
+  MLSTACK_BASENAME="$(basename "$MLSTACK_DIR")"
 
-    linked=()
-    for skill in "${SKILLS[@]}"; do
-      target="$CLAUDE_SKILLS_DIR/$skill"
-      if [ "$(cd "$MLSTACK_PARENT" 2>/dev/null && pwd)" = "$(cd "$CLAUDE_SKILLS_DIR" 2>/dev/null && pwd)" ]; then
-        # mlstack is inside the skills directory — use relative symlink
-        if [ -L "$target" ] || [ ! -e "$target" ]; then
-          ln -snf "$MLSTACK_BASENAME/$skill" "$target"
-          linked+=("$skill")
-        fi
-      else
-        # mlstack is elsewhere — use absolute symlink
-        if [ -L "$target" ] || [ ! -e "$target" ]; then
-          ln -snf "$MLSTACK_DIR/$skill" "$target"
-          linked+=("$skill")
-        fi
+  linked_count=0
+  for skill in $SKILLS_LIST; do
+    target="$CLAUDE_SKILLS_DIR/$skill"
+    if [ "$(cd "$MLSTACK_PARENT" 2>/dev/null && pwd)" = "$(cd "$CLAUDE_SKILLS_DIR" 2>/dev/null && pwd)" ]; then
+      # mlstack is inside the skills directory — use relative symlink
+      if [ -L "$target" ] || [ ! -e "$target" ]; then
+        ln -snf "$MLSTACK_BASENAME/$skill" "$target"
+        linked_count=$((linked_count + 1))
       fi
-    done
-
-    echo "Claude Code:"
-    if [ ${#linked[@]} -gt 0 ]; then
-      echo "  linked ${#linked[@]} skills in $CLAUDE_SKILLS_DIR"
     else
-      echo "  all skills already linked"
+      # mlstack is elsewhere — use absolute symlink
+      if [ -L "$target" ] || [ ! -e "$target" ]; then
+        ln -snf "$MLSTACK_DIR/$skill" "$target"
+        linked_count=$((linked_count + 1))
+      fi
     fi
+  done
+
+  echo "Claude Code:"
+  if [ "$linked_count" -gt 0 ]; then
+    echo "  linked $linked_count skills in $CLAUDE_SKILLS_DIR"
+  else
+    echo "  all skills already linked"
   fi
   echo ""
 fi
@@ -285,16 +293,16 @@ if [ "$REGISTER_CODEX" -eq 1 ]; then
 
   # Also symlink individual skill directories directly into codex skills
   # so they can be invoked as $skill-name without the mlstack/ prefix
-  linked=()
-  for skill in "${SKILLS[@]}"; do
+  linked_count=0
+  for skill in $SKILLS_LIST; do
     target="$CODEX_SKILLS_DIR/$skill"
     if [ -L "$target" ] || [ ! -e "$target" ]; then
       ln -snf "$MLSTACK_DIR/$skill" "$target"
-      linked+=("$skill")
+      linked_count=$((linked_count + 1))
     fi
   done
-  if [ ${#linked[@]} -gt 0 ]; then
-    echo "  linked ${#linked[@]} individual skills"
+  if [ "$linked_count" -gt 0 ]; then
+    echo "  linked $linked_count individual skills"
   fi
   echo ""
 fi
@@ -321,7 +329,7 @@ fi
 
 echo "mlstack ready."
 echo ""
-echo "  Skills: ${SKILLS[*]}"
+echo "  Skills: $SKILLS_LIST"
 if [ "$REGISTER_CLAUDE" -eq 1 ]; then
   echo "  Claude Code: ~/.claude/skills/"
 fi
