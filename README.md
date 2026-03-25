@@ -1,0 +1,77 @@
+# mlstack
+
+**mlstack turns Claude Code from one generic assistant into a team of ML/data specialists you can summon on demand.**
+
+Nine opinionated workflow skills for Claude Code. Analysis planning, statistical review, ML architecture review, notebook authoring, exploratory data analysis, feature engineering, model critique, retrospectives, and analysis shipping — all as slash commands.
+
+### Without mlstack
+- The agent takes your analysis request literally — it never asks if you're framing the problem correctly
+- It will fit whatever model you asked for, even when the data violates that model's assumptions
+- "Explore this dataset" gives inconsistent depth every time
+- The agent writes code but never explains why it chose that approach over alternatives
+- You still do methodology review by hand: check distributions, validate assumptions, eyeball residuals
+- Notebooks are walls of code with no narrative thread
+
+### With mlstack
+
+| Skill | Mode | What it does |
+|-------|------|-------------|
+| `/plan-science-review` | Principal Investigator | Rethink the research question. Challenge framing, identify confounds, map the causal structure before anyone touches data. |
+| `/plan-stats-review` | Biostatistician / Methods Lead | Lock in the analysis plan: study design, power analysis, assumption checks, multiple comparison strategy, pre-registration. |
+| `/plan-ml-review` | ML Architect | Challenge the modeling strategy across data modalities: architecture choices, representation strategy, training dynamics, compute-performance tradeoffs. |
+| `/review-notebook` | Paranoid methods reviewer | Find the statistical sins that pass a cursory glance but invalidate conclusions. Not a style nitpick pass. |
+| `/eda` | Senior Data Analyst | Systematic exploratory analysis with structured reports, distribution profiles, missingness maps, and relationship matrices. |
+| `/feature-eng` | ML Engineer | Feature engineering, selection, and transformation with domain-aware rationale and leakage detection. |
+| `/model-critique` | ML Research Scientist | Adversarial model evaluation. Challenge every modeling choice: was this the right algorithm, the right metric, the right validation strategy? |
+| `/retro-analysis` | Analytics Manager | Team-aware retrospective: analysis velocity, reproducibility, insight yield, and per-person growth. |
+| `/ship-analysis` | Release Analyst | Package analysis into a reproducible deliverable: freeze environment, validate outputs, generate executive summary, archive artifacts. |
+
+## Who this is for
+
+You're a data scientist, ML engineer, or quantitative researcher who uses Claude Code as a force multiplier. You want your AI assistant to think like a team of specialists — not just write code, but challenge your methodology, catch statistical errors before they become retracted papers, and produce analyses that would survive peer review.
+
+## Install
+
+```bash
+git clone https://github.com/yourusername/mlstack.git ~/.claude/skills/mlstack
+```
+
+Add to your `CLAUDE.md`:
+```markdown
+## mlstack skills
+- `/plan-science-review` — PI-mode analysis plan review (framing, confounds, causal structure)
+- `/plan-stats-review` — Biostatistician-mode methods review (assumptions, power, corrections)
+- `/plan-ml-review` — ML Architect-mode modeling review (architecture, representations, training dynamics)
+- `/review-notebook` — Pre-submission notebook review (statistical validity, reproducibility)
+- `/eda` — Systematic exploratory data analysis with structured reporting
+- `/feature-eng` — Feature engineering with leakage detection and domain rationale
+- `/model-critique` — Adversarial model evaluation and methodology challenge
+- `/retro-analysis` — Analytics team retrospective with reproducibility tracking
+- `/ship-analysis` — Package and ship reproducible analysis artifacts
+```
+
+## How I use these skills
+
+### The analysis lifecycle
+
+1. **Start with `/plan-science-review`** before touching data. This is your PI asking: "Is this the right question? What would actually constitute evidence? What are the confounders you haven't thought about?" It forces you to articulate the causal model before fitting anything.
+
+2. **Lock in methods with `/plan-stats-review`**. Your biostatistician reviews the analysis plan: sample size adequate? Assumptions checkable? Multiple comparisons handled? This catches the methodological landmines before you step on them.
+
+3. **Choose your modeling strategy with `/plan-ml-review`**. Your ML architect asks: is this the right representation for this data? Is a pretrained backbone appropriate? Is this architecture justified for this dataset size? Should you learn features end-to-end or hand-engineer them? This catches the modeling decisions that are invisible to classical statistics.
+
+4. **Explore with `/eda`**. Systematic exploration — not just `df.describe()`. Distribution profiling, missingness analysis, multicollinearity checks, target leakage scans. Produces a structured report you can reference throughout the project.
+
+5. **Engineer features with `/feature-eng`**. Domain-aware feature creation with explicit rationale for every transformation. Leakage detection built in. Tracks which features survived selection and why.
+
+6. **Critique with `/model-critique`** after training. Your adversarial reviewer asks: "Was nested cross-validation actually necessary here? Did you check if a simple baseline beats this? Your pipeline assumed normality but these features violate that assumption." This is the review that saves you from publishing embarrassing results.
+
+7. **Review notebooks with `/review-notebook`** before sharing. Catches the sins: p-hacking patterns, undisclosed multiple comparisons, leaky preprocessing, conclusions that don't follow from the evidence.
+
+8. **Ship with `/ship-analysis`**. Freeze the environment, validate all outputs reproduce, generate an executive summary, archive everything. Your analysis is now a citable, reproducible artifact.
+
+9. **Reflect with `/retro-analysis`**. Track analysis velocity, reproducibility rate, insight yield, and methodology quality over time.
+
+## License
+
+MIT

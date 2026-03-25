@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Environment
+.venv/
+env/
+*.egg
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data (too large for git)
+data/raw/*.csv
+data/raw/*.parquet
+*.pkl
+*.joblib
+*.h5
+*.pt
+*.onnx
+
+# IDE
+.vscode/
+.idea/
+
+# mlstack runtime
+.context/
