@@ -46,7 +46,7 @@ cd ~/.claude/skills/mlstack && ./setup
 
 The `setup` script:
 - Registers all skills with Claude Code (`~/.claude/skills/`) and Codex (`~/.codex/skills/`)
-- Creates or updates `CLAUDE.md` and `AGENTS.md` in your working directory with the skill list
+- Creates or updates `CLAUDE.md` and `AGENTS.md` with the skill list (auto-detects the right directory — see below)
 - Dynamically discovers skills from the repo — no hardcoded list to maintain
 
 ### Platform-specific install
@@ -67,15 +67,15 @@ cd ~/.codex/skills/mlstack && ./setup --codex
 ```bash
 cp -Rf ~/.claude/skills/mlstack .claude/skills/mlstack
 rm -rf .claude/skills/mlstack/.git
-cd .claude/skills/mlstack && ./setup --working-dir ../../../
+cd .claude/skills/mlstack && ./setup
 ```
 
-This copies mlstack into your repo and runs setup targeting the project root. The setup script will create or update `CLAUDE.md` and `AGENTS.md` with the skill list.
+Setup auto-detects that it's inside `.claude/skills/` and updates `CLAUDE.md` and `AGENTS.md` at the project root.
 
 ### What gets installed
 
 - Skill symlinks in `~/.claude/skills/` (Claude Code) and/or `~/.codex/skills/` (Codex)
-- `## mlstack skills` section auto-injected into `CLAUDE.md` and `AGENTS.md`
+- `## mlstack skills` section auto-injected into `CLAUDE.md` and `AGENTS.md` at the detected project root
 - Nothing touches your PATH or runs in the background
 
 ### Coexistence with gstack
@@ -97,7 +97,7 @@ To update a project-level install:
 ```bash
 cp -Rf ~/.claude/skills/mlstack .claude/skills/mlstack
 rm -rf .claude/skills/mlstack/.git
-cd .claude/skills/mlstack && ./setup --working-dir ../../../
+cd .claude/skills/mlstack && ./setup
 ```
 
 ## Uninstalling
@@ -120,11 +120,13 @@ Options:
   --claude          Register skills with Claude Code only
   --codex           Register skills with Codex only
   --no-docs         Skip updating CLAUDE.md / AGENTS.md
-  --working-dir DIR Update CLAUDE.md / AGENTS.md in DIR (default: $PWD)
+  --working-dir DIR Update CLAUDE.md / AGENTS.md in DIR (default: auto-detected)
   --help            Show this help message
 ```
 
 Without `--claude` or `--codex`, setup registers with all detected platforms.
+
+**Working directory auto-detection:** Setup walks up from its own location looking for `.claude/` or `.codex/` parent directories. If found, it targets the project root (the parent of `.claude/` or `.codex/`). This means `cd ~/.claude/skills/mlstack && ./setup` updates `~/CLAUDE.md` — not the mlstack directory itself. Use `--working-dir` to override.
 
 The script is idempotent — run it as many times as you want. It replaces the `## mlstack skills` section in-place if it already exists, preserving all other content in your documentation files.
 
