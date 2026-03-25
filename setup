@@ -136,13 +136,24 @@ update_doc_file() {
   # Check if mlstack section already exists
   if grep -q '^## mlstack skills' "$file"; then
     # Replace existing block: from "## mlstack skills" to next "## " header or EOF
+    # Write block to a temp file so awk can read it (BSD awk can't handle
+    # multi-line strings passed via -v)
+    local blockfile
+    blockfile="$(mktemp)"
+    echo "$block" > "$blockfile"
     local tmpfile
     tmpfile="$(mktemp)"
-    awk -v block="$block" '
-      /^## mlstack skills/ { in_block=1; print block; next }
+    awk -v blockfile="$blockfile" '
+      /^## mlstack skills/ {
+        in_block=1
+        while ((getline line < blockfile) > 0) print line
+        close(blockfile)
+        next
+      }
       in_block && /^## / { in_block=0 }
       !in_block { print }
     ' "$file" > "$tmpfile"
+    rm -f "$blockfile"
     mv "$tmpfile" "$file"
     echo "  updated $file (replaced mlstack skills section)"
   else
