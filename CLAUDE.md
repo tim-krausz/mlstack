@@ -14,9 +14,16 @@ mlstack/
 ├── review-perf/           # ML Performance Engineer review
 ├── retro-analysis/        # Analytics team retrospective
 ├── ship-analysis/         # Package and ship reproducible analysis
+├── setup                  # Setup script (registers skills, updates CLAUDE.md / AGENTS.md)
 ├── SKILL.md               # Top-level skill (Claude discovers this)
 └── README.md              # Project overview
 ```
+
+## Setup
+
+Run `./setup` to register skills with Claude Code and/or Codex and update instruction files.
+Run `./setup --help` for options. The script dynamically discovers skills from SKILL.md
+frontmatter — no hardcoded skill list to maintain when adding new skills.
 
 ## mlstack skills
 
