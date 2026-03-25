@@ -11,16 +11,21 @@ usage() {
 Usage: ./setup [OPTIONS]
 
 Register mlstack skills with Claude Code and/or Codex, and optionally
-inject the skill list into CLAUDE.md / AGENTS.md in your working directory.
+inject the skill list into CLAUDE.md / AGENTS.md.
 
 Options:
   --claude          Register skills with Claude Code only
   --codex           Register skills with Codex only
   --no-docs         Skip updating CLAUDE.md / AGENTS.md
-  --working-dir DIR Update CLAUDE.md / AGENTS.md in DIR (default: \$PWD)
+  --working-dir DIR Update CLAUDE.md / AGENTS.md in DIR (default: auto-detected)
   --help            Show this help message
 
 Without --claude or --codex, setup registers with all detected platforms.
+
+Working directory auto-detection:
+  1. If mlstack is inside a .claude/skills/ or .codex/skills/ tree, the
+     working dir is the project root (the parent of .claude/ or .codex/).
+  2. Otherwise, defaults to the caller's working directory.
 EOF
   exit 0
 }
@@ -137,6 +142,44 @@ update_doc_file() {
   fi
 }
 
+# Detect the best working directory for CLAUDE.md / AGENTS.md updates.
+# Walks up from MLSTACK_DIR looking for .claude/ or .codex/ parent patterns.
+# Examples:
+#   ~/.claude/skills/mlstack  → ~/ (home dir, global install)
+#   ./project/.claude/skills/mlstack  → ./project/ (project install)
+#   ~/.codex/skills/mlstack  → ~/ (codex global install)
+#   /some/random/path/mlstack  → caller's $PWD (fallback)
+detect_working_dir() {
+  local dir="$MLSTACK_DIR"
+
+  # Walk up looking for a .claude or .codex parent
+  while [ "$dir" != "/" ]; do
+    local base
+    base="$(basename "$dir")"
+    local parent
+    parent="$(dirname "$dir")"
+
+    # Check if we're inside .claude/skills/ or .codex/skills/
+    if [[ "$dir" == */.claude/skills/* ]] || [[ "$dir" == */.codex/skills/* ]]; then
+      # Go up to the .claude or .codex directory, then one more to the project root
+      local skills_dir
+      skills_dir="$(dirname "$dir")"
+      while [[ "$(basename "$skills_dir")" != ".claude" ]] && [[ "$(basename "$skills_dir")" != ".codex" ]] && [[ "$skills_dir" != "/" ]]; do
+        skills_dir="$(dirname "$skills_dir")"
+      done
+      if [[ "$(basename "$skills_dir")" == ".claude" ]] || [[ "$(basename "$skills_dir")" == ".codex" ]]; then
+        echo "$(dirname "$skills_dir")"
+        return
+      fi
+    fi
+
+    dir="$parent"
+  done
+
+  # Fallback: caller's working directory
+  echo "$PWD"
+}
+
 # ─── Parse arguments ──────────────────────────────────────────────────────────
 
 REGISTER_CLAUDE=0
@@ -161,9 +204,13 @@ if [ "$REGISTER_CLAUDE" -eq 0 ] && [ "$REGISTER_CODEX" -eq 0 ]; then
   REGISTER_CODEX=1
 fi
 
-# Default working dir: caller's PWD (not mlstack dir)
+# Default working dir: auto-detect from mlstack's location
+# If mlstack lives inside a .claude/skills/ or .codex/skills/ tree, the working
+# dir is the project root (parent of .claude/ or .codex/). This means the typical
+# flow "cd ~/.claude/skills/mlstack && ./setup" updates CLAUDE.md / AGENTS.md in
+# the right place without needing --working-dir.
 if [ -z "$WORKING_DIR" ]; then
-  WORKING_DIR="${OLDPWD:-$PWD}"
+  WORKING_DIR="$(detect_working_dir)"
 fi
 
 # ─── Discover skills ─────────────────────────────────────────────────────────
